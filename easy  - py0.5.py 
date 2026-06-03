@@ -1,0 +1,260 @@
+import tkinter as tk
+from tkinter import ttk, simpledialog, messagebox
+import time
+import random
+import string
+
+# メモリと状態の管理
+variables = {}
+last_if_condition = True
+output_widget = None
+
+# --- 多言語メッセージの設定 ---
+LANG_TEXTS = {
+    "日本語": {
+        "title": "マスター自作言語エディタ", 
+        "label": "コードを入力してください:", 
+        "btn": "▶ 実行する", 
+        "output": "実行結果:",
+        "hint": "* 保存/表示/応援/もし/絶対に/繰り返す/待つ/乱数/入力/合体",
+        "sample": "入力 桁 = パスワードは何桁にする？\nパスワード 生成結果 = 桁\nアニメ 生成したパスワードは以下です：\n表示 生成結果\n音\n警告 完了しました！"
+    },
+    "English": {
+        "title": "Master Custom Editor", 
+        "label": "Enter Code:", 
+        "btn": "▶ RUN", 
+        "output": "Output:",
+        "hint": "* Commands: let/print/cheer/if/else/loop/wait/rand/ask/join",
+        "sample": "ask length = How many digits?\npassword res = length\ntype Password is:\nprint res\nbeep\nalert Done!"
+    }
+}
+
+# --- 画面（GUI）の構築 ---
+root = tk.Tk()
+root.title("My Master Language App")
+root.geometry("400x600")
+APP_FONT = ("Helvetica", 11)
+
+def on_language_change(event=None):
+    lang = lang_combo.get()
+    text = LANG_TEXTS[lang]
+    label_code.config(text=text["label"])
+    btn_run.config(text=text["btn"])
+    label_out.config(text=text["output"])
+    label_hint.config(text=text["hint"])
+    code_entry.delete("1.0", tk.END)
+    code_entry.insert("1.0", text["sample"])
+
+frame_top = tk.Frame(root)
+frame_top.pack(fill="x", padx=10, pady=5)
+lang_combo = ttk.Combobox(
+    frame_top, 
+    values=list(LANG_TEXTS.keys()), 
+    state="readonly", 
+    width=8, 
+    font=APP_FONT
+)
+lang_combo.set("日本語")
+lang_combo.pack(side="left")
+lang_combo.bind("<<ComboboxSelected>>", on_language_change)
+
+label_hint = tk.Label(
+    frame_top, 
+    text="", 
+    fg="darkgreen", 
+    font=("Helvetica", 8, "bold"), 
+    wraplength=280, 
+    justify="left"
+)
+label_hint.pack(side="left", padx=5)
+
+label_code = tk.Label(root, text="", anchor="w", font=APP_FONT)
+label_code.pack(fill="x", padx=10, pady=(10, 2))
+code_entry = tk.Text(root, height=10, font=APP_FONT)
+code_entry.pack(fill="both", expand=True, padx=10, pady=2)
+# --- 自作言語の処理エンジン ---
+def run_my_language(code):
+    global variables, last_if_condition
+    lines = code.split("\n")
+    outputs = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # [COMMAND] 消去
+        if line in ["消去", "clear"]:
+            outputs = ["CLEAR_SIGNAL"]
+            continue
+
+        # [COMMAND] 音
+        if line in ["音", "beep"]:
+            root.bell()
+            outputs.append("[BEEP] Sound played")
+            continue
+
+        # [COMMAND] アプリ終了
+        if line in ["アプリ終了", "close"]:
+            root.destroy()
+            return "CLOSED"
+
+        # [COMMAND] 警告
+        if any(line.startswith(cmd + " ") for cmd in ["警告", "alert"]):
+            _, msg = line.split(" ", 1)
+            msg_val = str(evaluate_expression(msg.strip()))
+            messagebox.showwarning("Alert / 警告", msg_val)
+            outputs.append(f"[ALERT] Showed: {msg_val}")
+            continue
+
+        # [COMMAND] アニメ
+        if any(line.startswith(cmd + " ") for cmd in ["アニメ", "type"]):
+            _, msg = line.split(" ", 1)
+            msg_val = str(evaluate_expression(msg.strip()))
+            outputs.append(f"__TYPE_EFFECT__:{msg_val}")
+            continue
+
+        # [COMMAND] 待つ
+        if any(line.startswith(cmd + " ") for cmd in ["待つ", "wait"]):
+            _, sec_str = line.split(" ", 1)
+            sec = float(evaluate_expression(sec_str.strip()))
+            time.sleep(sec)
+            outputs.append(f"[WAIT] {sec} sec")
+            continue
+
+        # [COMMAND] 乱数
+        if any(line.startswith(cmd + " ") for cmd in ["乱数", "rand"]):
+            _, rest = line.split(" ", 1)
+            var_name, range_str = rest.split("=", 1)
+            min_val, max_val = range_str.strip().split()
+            rand_res = random.randint(int(min_val), int(max_val))
+            variables[var_name.strip()] = rand_res
+            outputs.append(f"[RAND] {var_name.strip()} = {rand_res}")
+            continue
+
+        # [COMMAND] 入力
+        if any(line.startswith(cmd + " ") for cmd in ["入力", "ask"]):
+            _, rest = line.split(" ", 1)
+            var_name, prompt_str = rest.split("=", 1)
+            user_res = simpledialog.askstring("Input", prompt_str.strip())
+            if user_res is None: user_res = ""
+            try: variables[var_name.strip()] = int(user_res)
+            except: variables[var_name.strip()] = user_res
+            outputs.append(f"[INPUT] {var_name.strip()} = {user_res}")
+            continue
+
+        # [COMMAND] 合体
+        if any(line.startswith(cmd + " ") for cmd in ["合体", "join"]):
+            _, rest = line.split(" ", 1)
+            var_name, parts_str = rest.split("=", 1)
+            parts = parts_str.strip().split()
+            combined = ""
+            for part in parts:
+                if part in variables: combined += str(variables[part])
+                else: combined += str(part)
+            variables[var_name.strip()] = combined
+            outputs.append(f"[JOIN] {var_name.strip()} = {combined}")
+            continue
+
+        # [COMMAND] パスワード
+        if any(line.startswith(cmd + " ") for cmd in ["パスワード", "password"]):
+            _, rest = line.split(" ", 1)
+            var_name, length_str = rest.split("=", 1)
+            length = int(evaluate_expression(length_str.strip()))
+            chars = string.ascii_letters + string.digits
+            pw = "".join(random.choice(chars) for _ in range(length))
+            variables[var_name.strip()] = pw                
+            outputs.append(f"[PASSWORD] {var_name.strip()} = {pw}")
+            continue
+
+        # [COMMAND] 保存
+        if any(line.startswith(cmd + " ") for cmd in ["保存", "let"]):
+            _, expr = line.split(" ", 1)
+            var_name, var_expr = expr.split("=", 1)
+            result = evaluate_expression(var_expr.strip())
+            variables[var_name.strip()] = result
+            outputs.append(f"[SAVE] {var_name.strip()} = {result}")
+            continue
+
+        # [COMMAND] 表示 / 応援
+        if any(line.startswith(cmd + " ") for cmd in ["表示", "print"]):
+            _, expr = line.split(" ", 1)
+            result = evaluate_expression(expr.strip())
+            outputs.append(str(result))
+            continue
+        if any(line.startswith(cmd + " ") for cmd in ["応援", "cheer"]):
+            _, expr = line.split(" ", 1)
+            result = evaluate_expression(expr.strip())
+            outputs.append(f"[CHEER] >>> {result} <<<")
+            continue
+
+    return "\n".join(outputs)
+
+# 式の計算
+def evaluate_expression(expr):
+    if str(expr) in variables:
+        return variables[str(expr)]
+    for op in ["+", "-", "*", "/"]:
+        if op in str(expr):
+            expr = str(expr).replace(op, f" {op} ")
+    tokens = str(expr).split()
+    if not tokens: return expr
+    try:
+        first_token = tokens[0]
+        result = variables[first_token] if first_token in variables else int(first_token)
+        i = 1
+        while i < len(tokens):
+            op = tokens[i]
+            next_token = tokens[i+1]
+            next_val = variables[next_token] if next_token in variables else int(next_token)
+            if op == "+": result += next_val
+            elif op == "-": result -= next_val
+            elif op == "*": result *= next_val
+            elif op == "/": result = result // next_val
+            i += 2
+        return result
+    except: return expr
+
+# アニメーションとボタンの連動処理
+def animate_text(text_str, idx=0):
+    if idx < len(text_str):
+        output_widget.config(state="normal")
+        output_widget.insert(tk.END, text_str[idx])
+        output_widget.config(state="disabled")
+        root.after(100, lambda: animate_text(text_str, idx + 1))
+
+def press_run():
+    global output_widget
+    user_code = code_entry.get("1.0", tk.END)
+    result = run_my_language(user_code)
+    if result == "CLOSED": return
+    
+    output_widget.config(state="normal")
+    output_widget.delete("1.0", tk.END)
+    
+    if result == "CLEAR_SIGNAL":
+        output_widget.config(state="disabled")
+        return
+        
+    if "__TYPE_EFFECT__:" in result:
+        before, after = result.split("__TYPE_EFFECT__:", 1)
+        if before: output_widget.insert("1.0", before + "\n")
+        output_widget.config(state="disabled")
+        animate_text(after)
+    else:
+        output_widget.insert("1.0", str(result))
+        output_widget.config(state="disabled")
+
+btn_run = tk.Button(
+    root, text="", bg="#17a2b8", fg="white", 
+    font=("Helvetica", 14, "bold"), command=press_run
+)
+btn_run.pack(fill="x", padx=10, pady=5)
+
+label_out = tk.Label(root, text="", anchor="w", font=APP_FONT)
+label_out.pack(fill="x", padx=10, pady=(5, 2))
+output_widget = tk.Text(root, height=8, bg="#f8f9fa", font=APP_FONT, state="disabled")
+output_widget.pack(fill="both", expand=True, padx=10, pady=(2, 10))
+
+on_language_change()
+root.mainloop()
