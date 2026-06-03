@@ -32,7 +32,7 @@ An advanced custom mini-programming language interpreter built with Python and T
 
 ## 🚀 How to Run (動かし方)
 1. Install **Pydroid 3** on your Android device.
-2. Copy the Python code (`main.py`) into your editor.
+2. Copy the Python code (`Easy.py`) into your editor.
 3. Tap the **RUN** button and enjoy!
 
 ## 💻 Advanced Sample Code (サンプルプログラム)
