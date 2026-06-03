@@ -57,4 +57,4 @@ beep
 alert Done!
 ```
 # Easy.py-0.5
-It's early,This time, we've added 14 more programming languages to run this program compared to the previous version. 
+This time, we've added 14 more programming languages to run this program compared to the previous version. 
